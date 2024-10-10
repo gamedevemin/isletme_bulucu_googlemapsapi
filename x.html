@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BUL</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>BUL</h1>
+  </header>
+  <input type="text" id="semt-adi" placeholder="Semt Adı Giriniz">
+  
+  <!-- Anahtar kelime girişleri için konteyner -->
+  <div id="keyword-container">
+    <div class="keyword-input">
+      <input type="text" name="keyword" placeholder="Aranacak Kelimeyi Giriniz">
+    </div>
+  </div>
+  <button id="add-keyword-button">+</button>
+  
+  <!-- Radio butonlar -->
+  <div>
+    <label><input type="radio" name="phone-option" value="show" checked> Telefon Numarası Gösterilsin</label>
+    <label><input type="radio" name="phone-option" value="hide"> Telefon Numarası Gösterilmesin</label><br>
+    <label><input type="radio" name="address-option" value="show" checked> Adres Gösterilsin</label>
+    <label><input type="radio" name="address-option" value="hide"> Adres Gösterilmesin</label><br>
+    <label><input type="radio" name="website-option" value="show" checked> Websitesi Gösterilsin</label>
+    <label><input type="radio" name="website-option" value="hide"> Websitesi Gösterilmesin</label>
+  </div>
+
+  <button id="search-button">Ara</button>
+
+  <!-- Arama kutusu -->
+  <div id="filter-section">
+    <h2>Filtrele</h2>
+    <input type="text" id="word-search" placeholder="Filtre kelimelerini ara" onkeyup="filterWordList()">
+    <div id="filter-list"></div>
+    <button onclick="applyFilter()">Filtreyi Uygula</button>
+  </div>
+
+  <div id="map" style="height: 400px; width: 100%;"></div>
+
+  <!-- Sonuç listeleri -->
+  <h2>Güncellenmiş Sonuçlar</h2>
+  <ul id="places-list"></ul>
+
+  <div id="removed-section">
+    <h2>Silinen Sonuçlar</h2>
+    <ul id="removed-places-list"></ul>
+  </div>
+
+  <!-- Google Maps API Script -->
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC5_e7Wo02qxnSCWqMdlpJyhpwi09zs6vg&libraries=places&callback=initMap&v=weekly"
+    defer
+    loading="lazy"
+  ></script>
+
+  <!-- JavaScript Kodunuz -->
+  <script>
+    let map;
+    let allResults = []; // Tüm sonuçları burada biriktireceğiz
+    let uniqueWords = []; // Eşsiz kelimeler burada biriktirilecek
+    let mahalleler = {
+      'bağcılar': ['15 temmuz', 'bağlar', 'barbaros', 'çınar', 'demirkapı', 'fatih', 'fevzi çakmak', 'göztepe', 'güneşli', 'hürriyet', 'inönü', 'kâzım karabekir', 'kemalpaşa', 'kirazlı', 'mahmutbey', 'merkez'], // Bağcılar için örnek mahalleler
+      'adalar': ['burgazada', 'heybeliada', 'kınalıada', 'maden'],
+      'kadıköy': ['19 mayıs', 'acıbadem', 'bostancı', 'caddebostan', 'caferağa', 'dumlupınar', 'eğitim', 'erenköy', 'fenerbahçe', 'feneryolu', 'fikirtepe', 'göztepe', 'hasanpaşa', 'koşuyolu', 'kozyatağı', 'merdivenköy', 'osmanga', 'rasimpaşa', 'sahrayıcedid', 'suadiye', 'zühtüpaşa'],
+      'arnavutköy': ['anadolu', 'imrahor', 'islambey', 'arnavutköy merkez', 'yavuz selim', 'atatürk', 'boğazköy atatürk', 'boğazköy istiklal', 'boğazköy merkez', 'bolluca', 'deliklikaya', 'dursunköy', 'durusu cami', 'durusu zafer', 'hastane', 'istasyon', 'sazlıbosna', 'karlıbayır', 'haraççı', 'hicret', 'mavigöl', 'nenehatun', 'ömerli', 'taşoluk', 'taşoluk adnan menderes', 'taşoluk çilingir', 'taşoluk fatih', 'taşoluk m. fevzi çakmak', 'taşoluk mehmet akif ersoy', 'yeşilbayır'],
+      'ataşehir': ['aşıkveysel', 'atatürk', 'barbaros', 'esatpaşa', 'ferhatpaşa', 'fetih', 'içerenköy', 'inönü', 'kayışdağı', 'küçükbakkalköy', 'mevlana', 'mimarsinan', 'mustafa kemal', 'örnek', 'yeniçamlıca', 'yenişehir', 'yenisahra'],
+      'avcılar': ['ambarlı', 'cihangir', 'denizköşkler', 'firuzköy', 'gümüşpala', 'merkez', 'mustafa kemal paşa', 'tahtakale'],
+      'bahçelievler': ['bahçelievler', 'cumhuriyet', 'çobançeşme', 'fevzi çakmak', 'hürriyet', 'kocasinan', 'siyavuşpaşa', 'soğanlı', 'şirinevler', 'yenibosna', 'zafer'],
+      'bakırköy': ['ataköy 1. kısım', 'ataköy 2-5-6. kısım', 'ataköy 3-4-11. kısım', 'ataköy 7-8-9-10. kısım', 'basınköy', 'cevizlik', 'kartaltepe', 'osmaniye', 'sakızağacı', 'şenlikköy', 'yenimahalle', 'yeşilköy', 'yeşilyurt', 'zeytinlik', 'zuhuratbaba'],
+      'başakşehir': ['altınşehir', 'bahçeşehir 1. kısım', 'bahçeşehir 2. kısım', 'başak', 'başakşehir', 'güvercintepe', 'kayabaşı', 'şahintepe', 'şamlar', 'ziya gökalp'],
+      'bayrampaşa': ['altıntepsi', 'cevatpaşa', 'ismetpaşa', 'kartaltepe', 'kocatepe', 'muratpaşa', 'orta', 'terazidere', 'vatan', 'yenidoğan', 'yıldırım'],
+      'beşiktaş': ['abbasağa', 'akat', 'arnavutköy', 'balmumcu', 'bebek', 'cihannüma', 'dikilitaş', 'etiler', 'gayrettepe', 'konaklar', 'kuruçeşme', 'kültür', 'levazım', 'levent', 'mecidiye', 'muradiye', 'nisbetiye', 'ortaköy', 'sinanpaşa', 'türkali', 'ulus', 'vişnezade', 'yıldız'],
+      'beykoz': ['acarlar', 'akbaba', 'alibahadır', 'anadolufeneri', 'anadoluhisarı', 'anadolukavağı', 'baklacı', 'bozhane', 'cumhuriyet', 'çamlıbahçe', 'çengeldere', 'çiftlik', 'çiğdem', 'çubuklu', 'dereseki', 'elmalı', 'fatih', 'göksu', 'göllü', 'görele', 'göztepe', 'gümüşsuyu', 'incirköy', 'ishaklı', 'kanlıca', 'kavacık', 'kaynarca', 'kılıçlı', 'merkez', 'mahmutşevketpaşa', 'ortaçeşme', 'öğümce', 'örnekköy', 'paşabahçe', 'paşamandıra', 'polonezköy', 'poyrazköy', 'riva', 'rüzgarlıbahçe', 'soğuksu', 'tokatköy', 'yalıköy', 'yavuzselim', 'yenimahalle', 'zerzevatçı'],
+      'beylikdüzü': ['adnan kahveci', 'barış', 'büyükşehir', 'cumhuriyet', 'dereağzı', 'gürpınar', 'kavaklı', 'marmara', 'sahil', 'yakuplu'],
+      'beyoğlu': ['arapcami', 'asmalımescit', 'bedrettin', 'bereketzade', 'bostan', 'bülbül', 'camiikebir', 'cihangir', 'çatmammescit', 'çukur', 'emekyemez', 'evliya çelebi', 'fetihtepe', 'firuzağa', 'gümüşsuyu', 'hacıahmet', 'hacımimi', 'halıcıoğlu', 'hüseyinağa', 'istiklal', 'kadı mehmet efendi', 'kamerhatun', 'kalyoncukulluğu', 'kaptanpaşa', 'katip mustafa çelebi', 'keçecipiri', 'kemankeş kara mustafa paşa', 'kılıçalipaşa', 'kocatepe', 'kulaksız', 'kuloğlu', 'küçükpiyale', 'müeyyetzade', 'ömeravni', 'örnektepe', 'piripaşa', 'piyalepaşa', 'pürtelaş', 'sururi', 'sütlüce', 'şahkulu', 'şehit muhtar', 'tomtom', 'yahya kahya', 'yenişehir'],
+      'büyükçekmece': ['19 mayıs', 'ahmediye', 'alkent 2000', 'atatürk', 'bahçelievler', 'celaliye', 'cumhuriyet', 'çakmaklı', 'dizdariye', 'ekinoba', 'fatih', 'güzelce', 'hürriyet', 'kamiloba', 'karaağaç', 'kumburgaz', 'mimaroba', 'mimarsinan', 'muratçeşme', 'pınartepe', 'sinanoba', 'türkoba', 'ulus', 'yenimahalle'],
+      'çatalca': ['akalan', 'atatürk', 'aydınlar', 'bahşayiş', 'başak', 'belgrat', 'celepköy', 'çakıl', 'çanakça', 'çiftlikköy', 'dağyenice', 'elbasan', 'fatih', 'ferhatpaşa', 'gökçeali', 'gümüşpınar', 'hallaçlı', 'hisarbeyli', 'ihsaniye', 'inceğiz', 'izzettin', 'kabakça', 'kaleiçi', 'kalfa', 'karacaköy', 'karamandere', 'kestanelik', 'kızılcaali', 'muratbey', 'nakkaş', 'oklalı', 'ormanlı', 'ovayenice', 'örcünlü', 'örencik', 'subaşı', 'yalıköy', 'yaylacık', 'yazlık'],
+      'çekmeköy': ['alemdağ', 'aydınlar', 'cumhuriyet', 'çamlık', 'çatalmeşe', 'ekşioğlu', 'güngören', 'hamidiye', 'hüseyinli', 'kirazlıdere', 'koçullu', 'mehmet akif', 'merkez', 'mimar sinan', 'nişantepe', 'ömerli', 'reşadiye', 'sırapınar', 'soğukpınar', 'sultançiftliği', 'taşdelen'],
+      'esenler': ['15 temmuz', 'birlik', 'çiftehavuzlar', 'davutpaşa', 'fatih', 'fevzi çakmak', 'havaalanı', 'kazım karabekir', 'kemer', 'menderes', 'mimar sinan', 'namık kemal', 'nenehatun', 'oruçreis', 'tuna', 'turgutreis', 'yavuz selim'],
+      'esenyurt': ['akçaburgaz', 'akevler', 'akşemseddin', 'ardıçlı', 'aşık veysel', 'atatürk', 'bağlarçeşme', 'balık yolu', 'barbaros hayrettin paşa', 'battalgazi', 'cumhuriyet', 'çınar', 'esenkent', 'fatih', 'gökevler', 'güzelyurt', 'hürriyet', 'incirtepe', 'inönü', 'istiklal', 'koza', 'mehmet akif ersoy', 'mehterçeşme', 'mevlana', 'namık kemal', 'necip fazıl kısakürek', 'orhan gazi', 'osmangazi', 'örnek', 'pınar', 'piri reis', 'saadetdere', 'selahaddin eyyubi', 'sultaniye', 'süleymaniye', 'şehitler', 'talatpaşa', 'turgut özal', 'üçevler', 'yenikent', 'yeşilkent', 'yunus emre', 'zafer'],
+      'eyüpsultan': ['5. levent', 'akşemsettin', 'alibeyköy', 'çırçır', 'defterdar', 'düğmeciler', 'emniyettepe', 'esentepe', 'merkez', 'göktürk', 'güzeltepe', 'islambey', 'karadolap', 'mimarsinan', 'mithatpaşa', 'nişanca', 'rami cuma', 'rami yeni', 'sakarya', 'silahtarağa', 'topçular', 'yeşilpınar'],
+      'fatih': ['aksaray', 'akşemsettin', 'alemdar', 'ali kuşçu', 'atikali', 'ayvansaray', 'balabanağa', 'balat', 'beyazıt', 'binbirdirek', 'cankurtaran', 'cerrahpaşa', 'cibali', 'demirtaş', 'derviş ali', 'eminsinan', 'hacıkadın', 'hasekisultan', 'hırkaişerif', 'hobyar', 'hoca giyasettin', 'hocapaşa', 'iskenderpaşa', 'kalenderhane', 'karagümrük', 'katip kasım', 'kemalpaşa', 'kocamustafapaşa', 'küçükayasofya', 'mercan', 'mesihpaşa', 'mevlanakapı', 'mimar hayrettin', 'mimar kemalettin', 'mollafenari', 'mollagürani', 'mollahüsrev', 'muhsinehatun', 'nişanca', 'rüstempaşa', 'saraçishak', 'sarıdemir', 'seyyid ömer', 'silivrikapı', 'sultanahmet', 'sururi', 'süleymaniye', 'sümbülefendi', 'şehremini', 'şehsuvarbey', 'tahtakale', 'tayahatun', 'topkapı', 'yavuzsinan', 'yavuz sultan selim', 'yedikule', 'zeyrek'],
+      'gaziosmanpaşa': ['bağlarbaşı', 'barbaros hayrettin paşa', 'fevzi çakmak', 'hürriyet', 'karadeniz', 'karayolları', 'karlıtepe', 'kâzım karabekir', 'merkez', 'mevlana', 'pazariçi', 'sarıgöl', 'şemsipaşa', 'yenidoğan', 'yenimahalle', 'yıldıztabya'],
+      'güngören': ['akıncılar', 'abdurrahman nafiz gürman', 'gençosman', 'güneştepe', 'güven', 'haznedar', 'mareşal fevzi çakmak', 'mehmet nezih özmen', 'merkez', 'sanayi', 'tozkoparan'],
+      'kâğıthane': ['çağlayan', 'çeliktepe', 'gültepe', 'emniyet evleri', 'gürsel', 'hamidiye', 'harmantepe', 'hürriyet', 'mehmet akif ersoy', 'merkez', 'nurtepe', 'ortabayır', 'sultan selim', 'seyrantepe', 'şirintepe', 'talatpaşa', 'telsizler', 'yahya kemal', 'yeşilce'],
+      'kartal': ['atalar', 'cevizli', 'cumhuriyet', 'çavuşoğlu', 'esentepe', 'gümüşpınar', 'hürriyet', 'karlıktepe', 'kordonboyu', 'orhantepe', 'ortamahalle', 'petrol-iş', 'soğanlık', 'topselvi', 'uğur mumcu', 'yakacık çarşı', 'yakacık yeni', 'yalı', 'yukarımahalle', 'yunus'],
+      'küçükçekmece': ['atakent', 'atatürk', 'beşyol', 'cennet', 'cumhuriyet', 'fatih', 'fevzi çakmak', 'gültepe', 'halkalı', 'inönü', 'istasyon', 'kanarya', 'kartaltepe', 'kemalpaşa', 'mehmet akif', 'söğütlüçeşme', 'sultanmurat', 'tevfikbey', 'yarımburgaz', 'yenimahalle', 'yeşilova'],
+      'maltepe': ['altayçeşme', 'altıntepe', 'ayınevler', 'bağlarbaşı', 'başıbüyük', 'büyükbakkalköy', 'cevizli', 'çınar', 'esenkent', 'feyzullah', 'fındıklı', 'girne', 'gülensu', 'gülsuyu', 'idealtepe', 'küçükyalı', 'yalı', 'zümrütevler'],
+      'pendik': ['ahmet yesevi', 'bahçelievler', 'batı', 'çamçeşme', 'çamlık', 'çınardere', 'doğu', 'dumlupınar', 'ertuğrulgazi', 'esenler', 'esenyalı', 'fatih', 'fevzi çakmak', 'güllübağlar', 'güzelyalı', 'harmandere', 'kavakpınar', 'kaynarca', 'kurtköy', 'orhangazi', 'orta', 'ramazanoğlu', 'sanayi', 'sapanbağları', 'sülüntepe', 'şeyhli', 'velibaba', 'yayalar', 'yenimahalle', 'yenişehir', 'yeşilbağlar'],
+      'sancaktepe': ['abdurrahmangazi', 'akpınar', 'atatürk', 'emek', 'eyüp sultan', 'fatih', 'hilal', 'inönü', 'kemal türkler', 'meclis', 'merve', 'mevlana', 'osmangazi', 'safa', 'sarıgazi', 'veysel karani', 'yenidoğan', 'yunus emre'],
+      'sarıyer': ['ayazağa', 'baltalimanı', 'bahçeköy kemer', 'bahçeköy', 'bahçeköy yenimahalle', 'büyükdere', 'cumhuriyet', 'çayırbaşı', 'darüşşafaka', 'demirciköy', 'derbent (çamlıtepe)', 'emirgân', 'fatih sultan mehmet', 'ferahevler', 'garipçe', 'istinye', 'kâzım karabekir', 'kireçburnu', 'kocataş', 'kumköy (kilyos)', 'kumköy', 'kilyos', 'maden', 'pınar', 'poligon', 'ptt evleri', 'reşitpaşa', 'rumelihisarı', 'rumelifeneri', 'rumelikavağı', 'maslak', 'merkez', 'tarabya', 'uskumruköy', 'yeniköy', 'yenimahalle', 'zeke'],
+      'silivri': ['alibey', 'alipaşa', 'büyük çavuşlu', 'cumhuriyet', 'çanta fatih', 'çanta mimarsinan', 'değirmenköy ismetpaşa', 'değirmenköy fevzipaşa', 'fatih', 'gazitepe (haraççı)', 'gümüşyaka', 'kadıköy', 'kavaklı hürriyet', 'kavaklı cumhuriyet', 'küçük kılıçlı', 'mimar sinan', 'ortaköy', 'piri mehmet paşa', 'selimpaşa', 'semizkumlar', 'yenimahalle', 'yolçatı'],
+      'sultanbeyli': ['abdurrahmangazi', 'adil', 'ahmet yesevi', 'akşemsettin', 'battalgazi', 'fatih', 'hamidiye', 'hasanpaşa', 'mecidiye', 'mehmet akif', 'mimarsinan', 'necip fazıl', 'orhangazi', 'turgutreis', 'yavuz selim'],
+      'sultangazi': ['50. yıl', '75. yıl', 'cebeci', 'cumhuriyet', 'esentepe', 'eski habibler', 'gazi', 'habibler', 'ismetpaşa', 'malkoçoğlu', 'sultançiftliği', 'uğur mumcu', 'yayla', 'yunusemre', 'zübeydehanım'],
+      'şile': ['ağva', 'balibey', 'çavuş', 'hacıkasım', 'kumbaba'],
+      'şişli': ['19 mayıs', 'bozkurt', 'cumhuriyet', 'duatepe', 'ergenekon', 'esentepe', 'eskişehir', 'feriköy', 'fulya', 'gülbahar', 'halaskargazi', 'halide edip adıvar', 'halil rıfat paşa', 'harbiye', 'inönü', 'izzetpaşa', 'kaptanpaşa', 'kuştepe', 'mahmut şevket paşa', 'mecidiyeköy', 'merkez', 'meşrutiyet', 'paşa', 'teşvikiye', 'yayla'],
+      'tuzla': ['akfırat', 'anadolu', 'aydınlı', 'aydıntepe', 'cami', 'evliya çelebi', 'fatih', 'içmeler', 'istasyon', 'mescit', 'mimar sinan', 'orhanlı', 'orta', 'postane', 'şifa', 'tepeören', 'yayla'],
+      'ümraniye': ['adem yavuz', 'altınşehir', 'armağanevler', 'aşağıdudullu', 'atakent', 'atatürk', 'cemil meriç', 'çakmak', 'çamlık', 'dumlupınar', 'elmalıkent', 'esenevler', 'esenşehir', 'fatih sultan mehmet', 'hekimbaşı', 'huzur', 'ihlamurkuyu', 'inkılap', 'istiklal', 'kâzım karabekir', 'mehmet akif', 'madenler', 'namık kemal', 'necip fazıl', 'parseller', 'saray', 'site', 'şerifali', 'tantavi', 'tatlısu', 'tepeüstü', 'topağacı', 'yamanevler', 'yeni sanayi', 'yukarıdudullu'],
+      'üsküdar': ['acıbadem', 'ahmediye', 'altunizade', 'aziz mahmud hüdayi', 'bahçelievler', 'barbaros', 'beylerbeyi', 'bulgurlu', 'burhaniye', 'cumhuriyet', 'çengelköy', 'ferah', 'güzeltepe', 'icadiye', 'kandilli', 'kirazlıtepe', 'kısıklı', 'kuleli', 'kuzguncuk', 'küçük çamlıca', 'küçüksu', 'küplüce', 'mehmet akif ersoy', 'mimar sinan', 'murat reis', 'salacak', 'selami ali', 'selimiye', 'sultantepe', 'ünalan', 'valide-i atik', 'yavuztürk', 'zeynep kamil'],
+      'zeytinburnu': ['beştelsiz', 'çırpıcı', 'gökalp', 'kazlıçeşme', 'maltepe', 'merkezefendi', 'nuripaşa', 'seyitnizam', 'sümer', 'telsiz', 'veliefendi', 'yenidoğan', 'yeşiltepe'],
+    };
+    let placesService;
+
+    function initMap() {
+      const istanbul = { lat: 41.0082, lng: 28.9784 }; // İstanbul koordinatları
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: istanbul,
+        zoom: 12,
+      });
+      placesService = new google.maps.places.PlacesService(map);
+
+      // Harita yüklendikten sonra arama butonunu etkinleştir
+      document.getElementById('search-button').addEventListener('click', semtArama);
+    }
+
+    // "+" butonuna tıklandığında yeni bir anahtar kelime input'u ekleyen fonksiyon
+    document.getElementById('add-keyword-button').addEventListener('click', function() {
+      const keywordContainer = document.getElementById('keyword-container');
+      const newKeywordInput = document.createElement('div');
+      newKeywordInput.className = 'keyword-input';
+      newKeywordInput.innerHTML = '<input type="text" name="keyword" placeholder="Aranacak Kelimeyi Giriniz">';
+      keywordContainer.appendChild(newKeywordInput);
+    });
+
+    function semtArama() {
+      if (!map) {
+        alert("Harita henüz yüklenmedi. Lütfen tekrar deneyiniz.");
+        return;
+      }
+      const semtAdi = document.getElementById('semt-adi').value.toLowerCase();
+      // Tüm anahtar kelimeleri alıyoruz
+      const keywordInputs = document.getElementsByName('keyword');
+      const keywords = Array.from(keywordInputs).map(input => input.value.trim()).filter(val => val !== '');
+
+      if (mahalleler[semtAdi]) {
+        clearPlacesList(); // Önceki sonuçları temizle
+        allResults = []; // Önceki sonuçları temizle
+        uniqueWords = []; // Önceki kelimeleri temizle
+        mahalleleriAra(semtAdi, keywords); // Her mahallede arama yap
+      } else {
+        alert("Bu semt için mahalle listesi bulunamadı.");
+      }
+    }
+
+    function mahalleleriAra(semt, keywords) {
+      const geocoder = new google.maps.Geocoder();
+      const bounds = new google.maps.LatLngBounds();
+
+      const mahallePromises = mahalleler[semt].map(mahalle => {
+        const mahalleArama = `${mahalle}, ${semt}, İstanbul`;
+        return new Promise((resolve, reject) => {
+          geocoder.geocode({ address: mahalleArama }, function(results, status) {
+            if (status === google.maps.GeocoderStatus.OK && results && results.length > 0) {
+              bounds.extend(results[0].geometry.location);
+              resolve();
+            } else {
+              console.log("Geocode başarısız: " + status + ". Sonuçlar: ", results);
+              resolve(); // Hata olsa bile devam edelim
+            }
+          });
+        });
+      });
+
+      Promise.all(mahallePromises).then(() => {
+        // Bounds hesaplandı, şimdi ızgarayı oluşturuyoruz
+        searchInAreaGrid(bounds, keywords, semt);
+      });
+    }
+
+    function searchInAreaGrid(bounds, keywords, semt) {
+      // Izgara boyutunu ayarlayın. Daha küçük değerler daha küçük grid hücreleri oluşturur.
+      const gridSizeLat = 0.0025; // Yaklaşık 250 metre
+      const gridSizeLng = 0.0025; // Yaklaşık 250 metre
+
+      const southWest = bounds.getSouthWest();
+      const northEast = bounds.getNorthEast();
+
+      const latStart = southWest.lat();
+      const latEnd = northEast.lat();
+      const lngStart = southWest.lng();
+      const lngEnd = northEast.lng();
+
+      const latSteps = Math.ceil((latEnd - latStart) / gridSizeLat);
+      const lngSteps = Math.ceil((lngEnd - lngStart) / gridSizeLng);
+
+      const gridCenters = [];
+
+      for (let i = 0; i < latSteps; i++) {
+        for (let j = 0; j < lngSteps; j++) {
+          const lat = latStart + i * gridSizeLat + gridSizeLat / 2;
+          const lng = lngStart + j * gridSizeLng + gridSizeLng / 2;
+          gridCenters.push(new google.maps.LatLng(lat, lng));
+        }
+      }
+
+      let allSearchPromises = [];
+
+      gridCenters.forEach(center => {
+        keywords.forEach(keyword => {
+          const searchPromise = searchInAreaGridCell(center, keyword, semt);
+          allSearchPromises.push(searchPromise);
+        });
+      });
+
+      Promise.all(allSearchPromises).then(() => {
+        // Tüm aramalar tamamlandı
+        processResults(allResults, semt);
+      });
+    }
+
+    function searchInAreaGridCell(location, keyword, semt) {
+      return new Promise((resolve, reject) => {
+        const request = {
+          location: location,
+          radius: '250', // 250 metre yarıçapında arama
+          query: keyword
+        };
+
+        let allResultsForKeyword = [];
+
+        function processTextSearchResults(results, status, pagination) {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            allResultsForKeyword = allResultsForKeyword.concat(results);
+
+            if (pagination && pagination.hasNextPage) {
+              // Sonraki sayfayı getirmek için biraz bekliyoruz
+              setTimeout(function() {
+                pagination.nextPage();
+              }, 2000);
+            } else {
+              // Tüm sayfalar işlendi, detayları al
+              processAllResultsForKeyword();
+            }
+          } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+            // Sonuç yok, yine de devam edelim
+            processAllResultsForKeyword();
+          } else {
+            console.error('Text search failed: ' + status);
+            processAllResultsForKeyword();
+          }
+        }
+
+        function processAllResultsForKeyword() {
+          let placesDetailsPromises = allResultsForKeyword.map(place => {
+            return new Promise((resolve, reject) => {
+              placesService.getDetails({ placeId: place.place_id }, (details, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                  resolve(details);
+                } else {
+                  resolve(place); // Detaylar alınamazsa orijinal sonucu kullan
+                }
+              });
+            });
+          });
+
+          Promise.all(placesDetailsPromises).then(placesDetails => {
+            // Sonuçlardan tekrar edenleri kaldır ve semt filtresi uygula
+            placesDetails.forEach(detail => {
+              const address = detail.formatted_address || detail.vicinity || '';
+              if (address.toLowerCase().includes(semt)) {
+                if (!allResults.some(existingPlace => existingPlace.place_id === detail.place_id)) {
+                  allResults.push(detail);
+                }
+              }
+            });
+
+            resolve(); // Bu grid hücresinin araması tamamlandı
+          });
+        }
+
+        // Aramayı başlatıyoruz
+        placesService.textSearch(request, processTextSearchResults);
+      });
+    }
+
+    function processResults(results, semt) {
+      const wordSet = new Set(uniqueWords); // Mevcut eşsiz kelimeleri koru
+
+      results.forEach(place => {
+        // Adresinde semt adının geçip geçmediğini kontrol ediyoruz
+        const address = place.formatted_address || place.vicinity || '';
+        if (address.toLowerCase().includes(semt)) {
+          // Her sonucu kelimelere bölüp eşsiz kelimeleri set'e ekle
+          place.name.split(' ').forEach(word => {
+            wordSet.add(word.toLowerCase());
+          });
+        }
+      });
+
+      uniqueWords = Array.from(wordSet); // Eşsiz kelimeler listesi
+      displayFilterOptions(uniqueWords);
+
+      // Filtreyi uygula
+      applyFilter();
+    }
+
+    function displayFilterOptions(words) {
+      const filterList = document.getElementById("filter-list");
+      filterList.innerHTML = ''; // Önceki filtreleri temizle
+
+      words.forEach(word => {
+        const label = document.createElement("label");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.name = "filter-word";
+        checkbox.value = word;
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(word));
+        // `label` öğesini bir kapsayıcı div içine alıyoruz
+        const container = document.createElement('div');
+        container.appendChild(label);
+        filterList.appendChild(container);
+      });
+    }
+
+    function applyFilter() {
+      const selectedWords = Array.from(document.querySelectorAll('input[name="filter-word"]:checked')).map(input => input.value.toLowerCase());
+
+      const filteredResults = allResults.filter(place => {
+        return !selectedWords.some(word => place.name.toLowerCase().includes(word));
+      });
+
+      const removedResults = allResults.filter(place => {
+        return selectedWords.some(word => place.name.toLowerCase().includes(word));
+      });
+
+      displayResults(filteredResults);
+      displayRemovedItems(removedResults);
+    }
+
+    function displayResults(results) {
+      const placesList = document.getElementById("places-list");
+      placesList.innerHTML = '';
+
+      results.forEach(place => {
+        const listItem = document.createElement("li");
+        let info = `${place.name}`;
+
+        // Radio butonlardan seçilen seçeneklere göre bilgiler ekleniyor
+        const showPhone = document.querySelector('input[name="phone-option"]:checked').value === 'show';
+        const showAddress = document.querySelector('input[name="address-option"]:checked').value === 'show';
+        const showWebsite = document.querySelector('input[name="website-option"]:checked').value === 'show';
+
+        if (showPhone && place.formatted_phone_number) {
+          info += ` - Tel: ${place.formatted_phone_number}`;
+        }
+        if (showAddress && (place.vicinity || place.formatted_address)) {
+          const address = place.formatted_address || place.vicinity || "Adres bulunamadı";
+          info += ` - Adres: ${address}`;
+        }
+        if (showWebsite && place.website) {
+          info += ` - Website: ${place.website}`;
+        }
+
+        listItem.textContent = info;
+        placesList.appendChild(listItem);
+      });
+    }
+
+    function updateFilterOptions(results) {
+      const wordSet = new Set();
+
+      results.forEach(place => {
+        place.name.split(' ').forEach(word => {
+          wordSet.add(word.toLowerCase());
+        });
+      });
+
+      uniqueWords = Array.from(wordSet); // Eşsiz kelimeler listesi
+      displayFilterOptions(uniqueWords);
+    }
+
+    function displayRemovedItems(removedResults) {
+      const removedList = document.getElementById("removed-places-list");
+      removedList.innerHTML = '';
+
+      removedResults.forEach(place => {
+        const listItem = document.createElement("li");
+        let info = `${place.name}`;
+
+        // Radio butonlardan seçilen seçeneklere göre bilgiler ekleniyor
+        const showPhone = document.querySelector('input[name="phone-option"]:checked').value === 'show';
+        const showAddress = document.querySelector('input[name="address-option"]:checked').value === 'show';
+        const showWebsite = document.querySelector('input[name="website-option"]:checked').value === 'show';
+
+        if (showPhone && place.formatted_phone_number) {
+          info += ` - Tel: ${place.formatted_phone_number}`;
+        }
+        if (showAddress && (place.vicinity || place.formatted_address)) {
+          const address = place.formatted_address || place.vicinity || "Adres bulunamadı";
+          info += ` - Adres: ${address}`;
+        }
+        if (showWebsite && place.website) {
+          info += ` - Website: ${place.website}`;
+        }
+
+        listItem.textContent = info;
+        removedList.appendChild(listItem);
+      });
+    }
+
+    // Kelime listesinde arama fonksiyonu
+    function filterWordList() {
+      const searchInput = document.getElementById("word-search").value.toLowerCase();
+      const labels = document.querySelectorAll('#filter-list label');
+
+      labels.forEach(label => {
+        const word = label.textContent.toLowerCase();
+        if (word.includes(searchInput)) {
+          label.parentElement.style.display = '';
+        } else {
+          label.parentElement.style.display = 'none';
+        }
+      });
+    }
+
+    function clearPlacesList() {
+      const placesList = document.getElementById("places-list");
+      while (placesList.firstChild) {
+        placesList.removeChild(placesList.firstChild);
+      }
+
+      const removedList = document.getElementById("removed-places-list");
+      while (removedList.firstChild) {
+        removedList.removeChild(removedList.firstChild);
+      }
+    }
+  </script>
+</body>
+</html>
