@@ -1,4 +1,4 @@
-# İşletme Bulucu Web Uygulaması
+# İşletme Bulucu Web Uygulaması w/ChatGPT
 
-Bu web uygulaması, kullanıcının girdiği **konum** ve **anahtar kelimeler** ile eşleşen işletmeleri bulmanızı sağlar. 
+Bu web uygulaması Google MAPS API ile çalışarak kullanıcının girdiği **konum** ve **anahtar kelimeler** ile eşleşen işletmeleri bulmanızı sağlar. 
 
